@@ -14,7 +14,7 @@ import java.io.IOException;
 @SpringBootApplication
 public class ReleaseutilApplication implements CommandLineRunner
 	{
-	private static final String GIT_REPO = "~/git-repo";
+	private static final String GIT_REPO = "/tmp/git-repo";
 	public static void main(String[] args) {
 		SpringApplication.run(ReleaseutilApplication.class, args);
 	}
