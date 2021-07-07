@@ -2,6 +2,7 @@ package team.releaseutil;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -13,7 +14,7 @@ import java.io.IOException;
 @SpringBootApplication
 public class ReleaseutilApplication implements CommandLineRunner
 	{
-
+	private static final String GIT_REPO = "~/git-repo";
 	public static void main(String[] args) {
 		SpringApplication.run(ReleaseutilApplication.class, args);
 	}
@@ -21,7 +22,13 @@ public class ReleaseutilApplication implements CommandLineRunner
 	@Override
 	public void run(String... args) throws IOException, GitAPIException
 		{
-		Git git = Git.open(new File("./"));
+		Git git;
+		try {
+			git = Git.open(new File(GIT_REPO));
+		} catch (RepositoryNotFoundException re){
+			System.out.println("Unable to find git repo " + GIT_REPO);
+			return;
+		}
 		for(RevCommit commit: git.log().all().call()){
 		  System.out.println(commit.getName() + " : " + commit.getShortMessage());
 		} 
