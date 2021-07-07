@@ -1,5 +1,6 @@
 package team.releaseutil;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
@@ -64,9 +65,11 @@ public class ReleaseutilApplication implements ApplicationRunner
 					", lead time (secs): " + leadTime.getSeconds());
 		});
 		System.out.println("\n");
-		
+
 		Deployment deployment = new Deployment(version, deployDesc, appId, rfcRef, Date.from(Instant.now()), "releaseutil", changes);
-		System.out.println(deployment);
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		objectMapper.writeValue(new File(gitRepo + "/release-notes.json"), deployment);
 	}
 
 	@Override
