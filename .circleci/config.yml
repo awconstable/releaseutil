@@ -113,8 +113,24 @@ jobs:
               $LATEST_DOCKER_TAG
   release-notes:
     docker:
-      - image: awconstable/releaseutil:v0.1-alpha
+      - image: awconstable/releaseutil:v0.2-alpha
     working_directory: ~/repo
     steps:
       - checkout
-      - run: echo "execute release util"
+      - run:
+          name: Extract release notes
+          command: |
+            if [ -n "$CIRCLE_TAG" ]; \
+            then \
+              export RELEASE_VERSION=${CIRCLE_TAG}; \
+            else \
+              export RELEASE_VERSION=b${CIRCLE_BUILD_NUM}; \
+            fi; \
+            java -cp @/app/jib-classpath-file team.releaseutil.ReleaseutilApplication \
+            --version=${RELEASE_VERSION} \
+            --rfcRef=rfc-na \
+            --appId=release-util \
+            --deployDesc="Auto deploy ${RELEASE_VERSION}" \
+            --release.git.repo.location=~/repo
+      - store_artifacts:
+          path: release-notes.json
