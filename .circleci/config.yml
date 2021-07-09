@@ -131,6 +131,6 @@ jobs:
             --rfcRef=rfc-na \
             --appId=release-util \
             --deployDesc="Auto deploy ${RELEASE_VERSION}" \
-            --release.git.repo.location=~/repo
+            --release.git.repo.location=/home/circleci/repo
       - store_artifacts:
           path: release-notes.json
