@@ -85,8 +85,11 @@
 						<image>registry.hub.docker.com/awconstable/releaseutil:${project.version}</image>
 					</to>
 					<from>
-						<image>gcr.io/distroless/java:11</image>
+						<image>registry.hub.docker.com/cimg/openjdk:16.0.0</image>
 					</from>
+					<container>
+						<entrypoint>INHERIT</entrypoint>
+					</container>
 				</configuration>
 			</plugin>
 			<plugin>
