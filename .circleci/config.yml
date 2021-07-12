@@ -127,7 +127,7 @@ jobs:
               export RELEASE_VERSION=b${CIRCLE_BUILD_NUM}; \
             fi; \
             java -cp @/app/jib-classpath-file team.releaseutil.ReleaseutilApplication \
-            --version=${RELEASE_VERSION} \
+            --curReleaseTag=${RELEASE_VERSION} \
             --rfcRef=rfc-na \
             --appId=release-util \
             --deployDesc="Auto deploy ${RELEASE_VERSION}" \

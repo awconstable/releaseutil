@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 
 @SpringBootApplication
 public class ReleaseutilApplication implements ApplicationRunner
@@ -36,23 +37,45 @@ public class ReleaseutilApplication implements ApplicationRunner
 		SpringApplication.run(ReleaseutilApplication.class, args);
 	}
 
-	public void outputReleaseNotes(String prevReleaseTag, String version, ZonedDateTime deployTime, String rfcRef, String appId, String deployDesc) throws GitAPIException, IOException
+	public void outputReleaseNotes(String prevReleaseTag, String curReleaseTag, ZonedDateTime deployTime, String rfcRef, String appId, String deployDesc) throws GitAPIException, IOException
 		{
 		Git git;
 		try {
-			System.out.println("Opening git repo " + gitRepo+ "\n");
+			System.out.println("Opening git repo " + gitRepo);
 			git = Git.open(new File(gitRepo));
 		} catch (RepositoryNotFoundException re){
-			System.out.println("Unable to find git repo " + gitRepo+ "\n");
+			System.out.println("Unable to find git repo " + gitRepo);
 			return;
 		}
 
 		List<Ref> tags = git.tagList().call();
-		System.out.println("List all tags. Count:  " + tags.size() + "\n");
-		tags.forEach(t -> System.out.println(t.getName()));
+		System.out.println("List all tags. Count:  " + tags.size());
 
-		Iterable<RevCommit> logs = git.log().setRevFilter(RevFilter.NO_MERGES).all().call();
-		System.out.println("Release Notes\n");
+		Optional<Ref> opCurrentTag = tags.stream().filter(t -> t.getName().equals(curReleaseTag)).findFirst();
+		Optional<Ref> opPrevTag = tags.stream().filter(t -> t.getName().equals(prevReleaseTag)).findFirst();
+		tags.forEach(t -> System.out.println(t.getName() +  " : " + t.getObjectId()));
+
+		Iterable<RevCommit> logs;
+		System.out.println("\n*****   Release Notes   *****");
+
+		if(tags.size() >= 2 && opCurrentTag.isPresent() && opPrevTag.isPresent()) {
+			Ref start = opPrevTag.get();
+			System.out.println("Start Tag: " + start.getName() + "(" + start.getObjectId() + ")");
+			Ref end = opCurrentTag.get();
+			System.out.println("End Tag: " + end.getName() + "(" + end.getObjectId() + ")");
+			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
+		} else if(tags.size() >= 2){
+			System.out.println("No tags specified, using 2 most recent tags");
+			Ref start = tags.get(tags.size() - 2);
+			System.out.println("Start Tag: " + start.getName() + "(" + start.getObjectId() + ")");
+			Ref end = tags.get(tags.size() - 1);
+			System.out.println("End Tag: " + end.getName() + "(" + end.getObjectId() + ")");
+			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
+		} else {
+			System.out.println("No tags specified or found, using all commit history");
+			logs = git.log().setRevFilter(RevFilter.NO_MERGES).call();
+		}
+
 		HashSet<Change> changes = new HashSet<>();
 		logs.forEach(r -> {
 			ZonedDateTime commitTime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(r.getCommitTime()), ZoneOffset.UTC);
@@ -60,13 +83,13 @@ public class ReleaseutilApplication implements ApplicationRunner
 			changes.add(new Change(r.getName(), Date.from(commitTime.toInstant()), "releaseutil", "commit"));
 			System.out.println(
 					"commit id: " + r.getName() +
-					", short message: " + r.getShortMessage() +
-					", commit time: " + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(commitTime) +
+					", message: " + r.getShortMessage() +
+					", committed: " + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(commitTime) +
 					", lead time (secs): " + leadTime.getSeconds());
 		});
 		System.out.println("\n");
 
-		Deployment deployment = new Deployment(version, deployDesc, appId, rfcRef, Date.from(Instant.now()), "releaseutil", changes);
+		Deployment deployment = new Deployment(curReleaseTag, deployDesc, appId, rfcRef, Date.from(Instant.now()), "releaseutil", changes);
 
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.writeValue(new File(gitRepo + "/release-notes.json"), deployment);
@@ -79,11 +102,11 @@ public class ReleaseutilApplication implements ApplicationRunner
 		if(args.containsOption("prevReleaseTag")){
 			prevReleaseTag = args.getOptionValues("prevReleaseTag").get(0);
 		}
-		String version;
-		if(args.containsOption("version")){
-			version = args.getOptionValues("version").get(0);
+		String curReleaseTag;
+		if(args.containsOption("curReleaseTag")){
+			curReleaseTag = args.getOptionValues("curReleaseTag").get(0);
 		} else {
-			System.out.println("version argument required");
+			System.out.println("curReleaseTag argument required");
 			return;
 		}
 		String rfcRef;
@@ -107,6 +130,6 @@ public class ReleaseutilApplication implements ApplicationRunner
 			System.out.println("deployDesc argument required");
 			return;
 		}
-		outputReleaseNotes(prevReleaseTag, version, ZonedDateTime.now(ZoneOffset.UTC), rfcRef, appId, deployDesc);
+		outputReleaseNotes(prevReleaseTag, curReleaseTag, ZonedDateTime.now(ZoneOffset.UTC), rfcRef, appId, deployDesc);
 		}
 	}
