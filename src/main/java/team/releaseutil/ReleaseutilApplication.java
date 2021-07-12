@@ -3,6 +3,8 @@ package team.releaseutil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -22,10 +24,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @SpringBootApplication
 public class ReleaseutilApplication implements ApplicationRunner
@@ -49,27 +48,28 @@ public class ReleaseutilApplication implements ApplicationRunner
 		}
 
 		List<Ref> tags = git.tagList().call();
-		System.out.println("List all tags. Count:  " + tags.size());
+		System.out.println("List all tags. Count: " + tags.size());
 
-		Optional<Ref> opCurrentTag = tags.stream().filter(t -> t.getName().equals(curReleaseTag)).findFirst();
-		Optional<Ref> opPrevTag = tags.stream().filter(t -> t.getName().equals(prevReleaseTag)).findFirst();
-		tags.forEach(t -> System.out.println(t.getName() +  " : " + t.getObjectId()));
+		Optional<Ref> opCurrentTag = tags.stream().filter(t -> t.getName().equals("refs/tags/" + curReleaseTag)).findFirst();
+		Optional<Ref> opPrevTag = tags.stream().filter(t -> t.getName().equals("refs/tags/" + prevReleaseTag)).findFirst();
+		tags.forEach(t -> System.out.println(t.getName() +  " : " + t.getObjectId().getName()));
 
 		Iterable<RevCommit> logs;
 		System.out.println("\n*****   Release Notes   *****");
 
 		if(tags.size() >= 2 && opCurrentTag.isPresent() && opPrevTag.isPresent()) {
 			Ref start = opPrevTag.get();
-			System.out.println("Start Tag: " + start.getName() + "(" + start.getObjectId() + ")");
+			System.out.println("Start Tag: " + start.getName() + " (" + start.getObjectId().getName() + ")");
 			Ref end = opCurrentTag.get();
-			System.out.println("End Tag: " + end.getName() + "(" + end.getObjectId() + ")");
+			System.out.println("End Tag: " + end.getName() + " (" + end.getObjectId().getName() + ")");
 			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
 		} else if(tags.size() >= 2){
+			tags.sort(Comparator.comparingInt(t -> findTagTimeStamp(git, t)));
 			System.out.println("No tags specified, using 2 most recent tags");
 			Ref start = tags.get(tags.size() - 2);
-			System.out.println("Start Tag: " + start.getName() + "(" + start.getObjectId() + ")");
+			System.out.println("Start Tag: " + start.getName() + " (" + start.getObjectId().getName() + ")");
 			Ref end = tags.get(tags.size() - 1);
-			System.out.println("End Tag: " + end.getName() + "(" + end.getObjectId() + ")");
+			System.out.println("End Tag: " + end.getName() + " (" + end.getObjectId().getName() + ")");
 			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
 		} else {
 			System.out.println("No tags specified or found, using all commit history");
@@ -93,6 +93,27 @@ public class ReleaseutilApplication implements ApplicationRunner
 
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.writeValue(new File(gitRepo + "/release-notes.json"), deployment);
+	}
+
+	private int findTagTimeStamp(Git git, Ref tag)
+		{
+		Iterable<RevCommit> logs = null;
+		try
+			{
+			logs = git.log().add(tag.getObjectId()).setMaxCount(1).call();
+			} catch (GitAPIException | MissingObjectException | IncorrectObjectTypeException e)
+			{
+			e.printStackTrace();
+			}
+		RevCommit log = null;
+		if (logs != null)
+			{
+			log = logs.iterator().next();
+			}
+		if(log != null){
+	       		return log.getCommitTime();
+		   }
+	      return 0;
 	}
 
 	@Override
