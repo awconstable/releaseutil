@@ -6,6 +6,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
@@ -52,6 +53,7 @@ public class ReleaseutilApplication implements ApplicationRunner
 
 		Optional<Ref> opCurrentTag = tags.stream().filter(t -> t.getName().equals("refs/tags/" + curReleaseTag)).findFirst();
 		Optional<Ref> opPrevTag = tags.stream().filter(t -> t.getName().equals("refs/tags/" + prevReleaseTag)).findFirst();
+		tags.sort(Comparator.comparingInt(t -> findTagTimeStamp(git, t)));
 		tags.forEach(t -> System.out.println(t.getName() +  " : " + t.getObjectId().getName()));
 
 		Iterable<RevCommit> logs;
@@ -59,18 +61,21 @@ public class ReleaseutilApplication implements ApplicationRunner
 
 		if(tags.size() >= 2 && opCurrentTag.isPresent() && opPrevTag.isPresent()) {
 			Ref start = opPrevTag.get();
-			System.out.println("Start Tag: " + start.getName() + " (" + start.getObjectId().getName() + ")");
+			ObjectId startId = (start.getPeeledObjectId() != null) ? start.getPeeledObjectId() : start.getObjectId();
+			System.out.println("Start Tag: " + start.getName() + " (" + startId.getName() + ")");
 			Ref end = opCurrentTag.get();
-			System.out.println("End Tag: " + end.getName() + " (" + end.getObjectId().getName() + ")");
-			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
+			ObjectId endId = (end.getPeeledObjectId() != null) ? end.getPeeledObjectId() : end.getObjectId();
+			System.out.println("End Tag: " + end.getName() + " (" + endId.getName() + ")");
+			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(startId, endId).call();
 		} else if(tags.size() >= 2){
-			tags.sort(Comparator.comparingInt(t -> findTagTimeStamp(git, t)));
 			System.out.println("No tags specified, using 2 most recent tags");
 			Ref start = tags.get(tags.size() - 2);
-			System.out.println("Start Tag: " + start.getName() + " (" + start.getObjectId().getName() + ")");
+			ObjectId startId = (start.getPeeledObjectId() != null) ? start.getPeeledObjectId() : start.getObjectId();
+			System.out.println("Start Tag: " + start.getName() + " (" + startId.getName() + ")");
 			Ref end = tags.get(tags.size() - 1);
-			System.out.println("End Tag: " + end.getName() + " (" + end.getObjectId().getName() + ")");
-			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(start.getObjectId(), end.getObjectId()).call();
+			ObjectId endId = (end.getPeeledObjectId() != null) ? end.getPeeledObjectId() : end.getObjectId();
+			System.out.println("End Tag: " + end.getName() + " (" + endId.getName() + ")");
+			logs = git.log().setRevFilter(RevFilter.NO_MERGES).addRange(startId, endId).call();
 		} else {
 			System.out.println("No tags specified or found, using all commit history");
 			logs = git.log().setRevFilter(RevFilter.NO_MERGES).call();
@@ -100,7 +105,8 @@ public class ReleaseutilApplication implements ApplicationRunner
 		Iterable<RevCommit> logs = null;
 		try
 			{
-			logs = git.log().add(tag.getObjectId()).setMaxCount(1).call();
+			ObjectId id = (tag.getPeeledObjectId() != null) ? tag.getPeeledObjectId() : tag.getObjectId();
+			logs = git.log().add(id).setMaxCount(1).call();
 			} catch (GitAPIException | MissingObjectException | IncorrectObjectTypeException e)
 			{
 			e.printStackTrace();
